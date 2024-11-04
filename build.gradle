@@ -1,0 +1,52 @@
+buildscript {
+	repositories {
+		mavenCentral()
+		gradlePluginPortal()
+	}
+	dependencies {
+		classpath 'org.xtext:xtext-gradle-plugin:4.0.0'
+		classpath 'com.github.johnrengelman:shadow:8.1.1'
+	}
+}
+
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'java'
+
+subprojects {
+	ext.xtextVersion = '2.34.0'
+	repositories {
+		mavenCentral()
+	}
+
+	apply plugin: 'java-library'
+	dependencies {
+		api platform("org.eclipse.xtext:xtext-dev-bom:${xtextVersion}")
+	}
+
+	apply plugin: 'org.xtext.xtend'
+	apply from: "${rootDir}/gradle/source-layout.gradle"
+	apply plugin: 'eclipse'
+	apply plugin: 'idea'
+	apply plugin: 'com.github.johnrengelman.shadow'
+
+	group = 'su.nsk.iae.edtl'
+	version = '1.0.0-SNAPSHOT'
+
+	java {
+		sourceCompatibility = JavaVersion.VERSION_11
+		targetCompatibility = JavaVersion.VERSION_11
+	}
+
+	configurations.all {
+		exclude group: 'asm'
+	}
+}
+
+shadowJar {
+	archiveBaseName = 'dsl-language-server'
+	archiveClassifier = ''
+	archiveVersion = ''
+	manifest {
+		attributes 'Main-Class': 'org.eclipse.xtext.ide.server.ServerLauncher'
+	}
+}

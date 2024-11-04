@@ -1,0 +1,212 @@
+grammar su.nsk.iae.edtl.Edtl hidden(WS, ML_COMMENT, SL_COMMENT)
+
+import "http://www.eclipse.org/emf/2002/Ecore" as ecore
+
+generate edtl "http://www.nsk.su/iae/edtl/Edtl"
+
+Model:
+	(
+		(declVarInput+=DeclVarInput)* &
+		(declVarOutput+=DeclVarOutput)* &
+		(varInits+=VarInit)* &
+		(abbrs+=Abbr)* &
+		(macroses+=Macros)* &
+		(reqs+=Requirement)* &
+		globInterval=GlobInterval?
+	);
+
+VariableType returns ecore::EString:
+	'BOOL' | 'INT';
+
+DeclVarInput:
+	{DeclVarInput}
+	'VAR_INPUT' 
+	('INPUT_PORTS_COUNTER' DECL_SYMB inputCounter=INTEGER ';')?
+	(varDecls+=VarDeclaration ';')*
+	 'END_VAR';
+
+DeclVarOutput:
+	{DeclVarOutput}
+	'VAR_OUTPUT' 
+	('OUTPUT_PORTS_COUNTER' DECL_SYMB outputCounter=INTEGER ';')?
+	(varDecls+=VarDeclaration ';')* 
+	'END_VAR';
+	
+VarDeclaration:
+	v=Variable ('AT' location=DIRECT_VARIABLE)? ':' type=VariableType;
+
+VarInit:
+	{VarInit}
+	'VAR_INIT'
+	(varAssign+=VarAssign ';')+
+	'END_VAR';
+	
+VarAssign:
+	variable=[Variable] DECL_SYMB value=(INTEGER | BOOLEAN_LITERAL);
+
+Abbr:
+	'ABBR' name=ID
+		expr=Expression
+	'END_ABBR';
+
+Macros:
+	'MACROS' name=ID '(' (args=VarList)? ')'
+		expr=Expression
+	'END_MACROS';
+
+VarList:
+	vars+=Variable (',' vars+=Variable)*;
+	
+GlobInterval: 
+	'INTERVAL' DECL_SYMB globInterval=TimeLiteral ';';
+	
+Requirement:
+	'REQ' name=ID
+		((
+			'TRIGGER'  DECL_SYMB  trigExpr=Expression ';'
+			('NL:' nlTrig=STRING ';')?
+		)?
+		&
+		(
+			'INVARIANT'  DECL_SYMB  invExpr=Expression ';'
+			('NL:' nlInv=STRING ';')?
+		)?
+		&
+		(
+			'FINAL'  DECL_SYMB  finalExpr=Expression ';'
+			('NL:' nlFinal=STRING ';')?
+		)?
+		&
+		(
+			'DELAY'  DECL_SYMB  delayExpr=Expression ';'
+			('NL:' nlDelay=STRING ';')?
+		)?
+		&
+		(
+			'REACTION'  DECL_SYMB  reacExpr=Expression ';'
+			('NL:' nlReac=STRING ';')?
+		)?
+		&
+		(
+			'RELEASE'  DECL_SYMB  relExpr=Expression ';'
+			('NL:' nlRel=STRING ';')?
+		)?)
+	'END_REQ';
+
+terminal DECL_SYMB:
+	':=';
+	
+Variable:
+	name=ID;
+	
+Expression:
+	XorExpression ({Expression.left=current} orOp=OR_OPERATOR right=XorExpression)*;
+
+terminal OR_OPERATOR:
+	'||' | 'OR';
+
+XorExpression:
+	AndExpression ({XorExpression.left=current} XOR_OPERATOR right=AndExpression)*;
+
+XOR_OPERATOR:
+	'XOR';
+	
+AndExpression:
+	CompExpression ({AndExpression.left=current} andOp=AND_OPERATOR right=CompExpression)*;
+
+AND_OPERATOR:
+	'&&' | 'AND';
+	
+CompExpression:
+	EquExpression ({CompExpression.left=current} compOp=CompOperator right=AndExpression)*;
+
+EquExpression:
+	UnExpression ({EquExpression.left=current} equOp=EquOperator right=UnExpression)*;
+	
+enum EquOperator:
+	EQUAL='==' | NOT_EQUAL='<>';
+
+enum CompOperator:
+	LESS='<' | GREATER='>' | LESS_EQU='<=' | GREATER_EQU='>=';
+
+UnOperator returns ecore::EString:
+	NotOperator | 'FE' | 'RE' | 'HIGH' | 'LOW' ;
+
+NotOperator:
+	'NOT' | '!';
+	
+UnExpression:
+	PrimaryExpression | unOp=UnOperator right=PrimaryExpression;
+
+TauExpression:
+	'TAU' '(' (time=TimeLiteral) ')';
+
+TimeLiteral:
+	 TIME_PREF_LITERAL interval=INTERVAL;
+
+TIME_PREF_LITERAL returns ecore::EString:
+	'T#';
+
+terminal INTERVAL returns ecore::EString:
+	(INTEGER 'd')? (INTEGER 'h')? (INTEGER 'm')? (INTEGER 's')? (INTEGER 'ms')?;
+
+PrimaryExpression:
+	constant=Constant | tau=TauExpression | v=[CrossVarAbbr] | macros=[Macros]'(' (args=ParamAssignmentElements)? ')' | '(' nestExpr=Expression ')';
+
+Constant:
+	INTEGER | BOOLEAN_LITERAL;
+	
+ParamAssignmentElements:
+	elements+=[CrossVarAbbr] (',' elements+=[CrossVarAbbr])*;
+	
+CrossVarAbbr:
+	Variable | Abbr;
+
+terminal DIRECT_VARIABLE returns ecore::EString:
+	'%' DIRECT_TYPE_PREFIX DIRECT_SIZE_PREFIX OCTAL_DIGIT ('.' OCTAL_DIGIT)*;
+
+terminal fragment DIRECT_TYPE_PREFIX:
+	'I' | 'Q' | 'M';
+
+terminal fragment DIRECT_SIZE_PREFIX:
+	'X' | 'B' | 'W' | 'D' | 'L';
+
+terminal INTEGER returns ecore::EString:
+	DIGIT+;
+
+terminal fragment LETTER:
+	'A'..'Z' | 'a'..'z' | '_';
+
+terminal fragment BIT:
+	'0' | '1';
+	
+terminal fragment OCTAL_DIGIT:
+	'0'..'7';
+
+terminal fragment DIGIT:
+	'0'..'9';
+
+terminal fragment HEX_DIGIT:
+	DIGIT | 'A'..'F';
+
+terminal BOOLEAN_LITERAL:
+	'TRUE' | 'FALSE';
+
+terminal ID returns ecore::EString:
+	LETTER (LETTER | DIGIT)*;
+
+terminal ML_COMMENT:
+    '/*' -> '*/' | '(*' -> '*)';
+ 
+terminal SL_COMMENT:
+    '//' !('\n'|'\r')* ('\r'? '\n')?;
+ 
+terminal WS:
+    (' '|'\t'|'\r'|'\n')+;
+    
+terminal STRING: 
+     '"' ( '\\'('b'|'t'|'n'|'f'|'r'|'u'|'"'|"'"|'\\') | !('\\'|'"') )* '"' |
+    "'" ( '\\'('b'|'t'|'n'|'f'|'r'|'u'|'"'|"'"|'\\') | !('\\'|"'") )* "'";
+    
+terminal ANY_OTHER:
+	.;

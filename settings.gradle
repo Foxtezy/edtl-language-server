@@ -1,0 +1,3 @@
+include 'su.nsk.iae.edtl'
+include 'su.nsk.iae.edtl.ide'
+include 'su.nsk.iae.edtl.tests'
