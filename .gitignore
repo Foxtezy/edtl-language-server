@@ -23,8 +23,11 @@ bin/
 *.iws
 .idea/
 out/
+.vscode
 
 # Gradle
 .gradle/
 build/
 !gradle-wrapper.jar
+
+update_server.bat

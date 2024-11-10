@@ -7,6 +7,8 @@ import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
+import org.eclipse.emf.common.util.BasicDiagnostic
+import org.eclipse.emf.common.util.Diagnostic
 import su.nsk.iae.edtl.edtl.Model
 import su.nsk.iae.edtl.edtl.Expression
 import su.nsk.iae.edtl.edtl.Abbr
@@ -15,11 +17,13 @@ import su.nsk.iae.edtl.edtl.XorExpression
 import su.nsk.iae.edtl.edtl.AndExpression
 import su.nsk.iae.edtl.edtl.UnExpression
 import su.nsk.iae.edtl.edtl.Macros
-import java.util.HashMap
+import java.util.*
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
 import com.opencsv.CSVWriter
+import org.logicng.formulas.FormulaFactory
+import org.logicng.formulas.Formula
 import java.io.StringWriter
 import su.nsk.iae.edtl.edtl.impl.ExpressionImpl
 import su.nsk.iae.edtl.edtl.impl.PrimaryExpressionImpl
@@ -28,6 +32,7 @@ import org.eclipse.emf.ecore.util.EcoreUtil.Copier
 import java.util.Objects
 import java.util.regex.Pattern
 import java.util.Map
+import java.util.ArrayList
 import java.time.Duration
 import java.time.temporal.TemporalUnit
 
@@ -70,7 +75,7 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 	
 	// Call expansion modules
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
-		
+		try {
 		var csvStringWriter = new StringWriter()
 		var csvWriter = new CSVWriter(csvStringWriter)
 		
@@ -92,6 +97,9 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 		}
 	
 		var reqNum = 1
+		val logicNGReqs = new ArrayList<Req>()
+		val logicNGFactory = new FormulaFactory()
+		val termToLogicNGConverter = new TermToLogicNGConverter(logicNGFactory)
 		
 		for (req : reqs) {
 			var trigger = ExprToTermConverter.convertOrDefault(req.trigExpr, Attribute.TRIGGER, new BoolTerm(true))
@@ -136,7 +144,25 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 				TermToStringConverter.convert(ltl_formula, globalTimeInterval, TimeRepresentation.INTERVAL)
 				// + expanded LTL
 			)
-			
+
+			var logicng_ltl_formula = Optional.empty();
+			try {
+				logicng_ltl_formula = Optional.of(termToLogicNGConverter.convert(ltl_formula))
+			} catch (Exception e) {
+				logicng_ltl_formula = Optional.empty()
+			}
+
+			logicNGReqs.add(new Req(
+				req.name,
+				termToLogicNGConverter.convert(trigger),
+				termToLogicNGConverter.convert(invariant),
+				termToLogicNGConverter.convert(fin),
+				termToLogicNGConverter.convert(delay),
+				termToLogicNGConverter.convert(reaction),
+				termToLogicNGConverter.convert(release),
+				logicng_ltl_formula
+			))
+
 			csvWriter.writeNext(csvRow)
 			reqNum++
 		}
@@ -147,6 +173,19 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 		fsa.generateFile("ltl_output.csv", csv)
 		
 		cGenerator.generateCCode(resource, fsa, context)
+
+		val consistency = new ConsistencyGenerator(logicNGFactory)
+		consistency.generate(logicNGReqs, fsa)
+		} catch (Exception e) {
+			val diagnostic = new Resource.Diagnostic {
+        		override getLocation() { resource.URI.toString }
+            	override getMessage() { e.toString() }
+            	override getLine() { -1 }
+            	override getColumn() { -1 }
+        	}
+        
+        	resource.errors.add(diagnostic)
+		}
 	}
 	
 	

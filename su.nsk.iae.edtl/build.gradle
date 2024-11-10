@@ -14,6 +14,8 @@ dependencies {
 	mwe2 "org.eclipse.xtext:org.eclipse.xtext.xtext.generator:${xtextVersion}"
 	mwe2 'org.eclipse.xtext:xtext-antlr-generator'
 	implementation 'com.opencsv:opencsv:5.7.1'
+	implementation 'org.logicng:logicng:2.6.0'
+    implementation 'org.logicng:logicng-parser-j11:2.6.0'
 }
 
 task generateXtextLanguage(type: JavaExec) {
@@ -31,3 +33,6 @@ processResources.dependsOn(generateXtextLanguage)
 generateXtext.dependsOn(generateXtextLanguage)
 clean.dependsOn(cleanGenerateXtextLanguage)
 eclipse.classpath.plusConfigurations += [configurations.mwe2]
+
+eclipseClasspath.enabled=false
+cleanEclipseClasspath.enabled=false
