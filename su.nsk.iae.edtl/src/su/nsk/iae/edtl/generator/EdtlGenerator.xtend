@@ -3,6 +3,7 @@
  */
 package su.nsk.iae.edtl.generator
 
+import su.nsk.iae.edtl.generator.consistency.*
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
@@ -46,6 +47,7 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 	val headerCsv = newArrayList(" ", "req name", "trigger", "invariant", "final", "delay", "reaction", "release", "LTL formula", "Substituted LTL formula")
 	
 	val cGenerator = new CGenerator
+	val consistency = new ConsistencyGenerator
 	
 	// Init expansion modules
 	static def void initGenerators() {
@@ -80,14 +82,51 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 		var csvWriter = new CSVWriter(csvStringWriter)
 		
 		csvWriter.writeNext(headerCsv)
-		
-		
+	
+		var reqNum = 1
 		val ast = resource.allContents.
 					toIterable.
 					filter(Model).
 					get(0)
-		val reqs = ast.reqs
+		val terms = parseEdtl(ast)
 		
+		for (term : terms) {
+			val csvRow = newArrayList(reqNum.toString(), term.name, 
+				TermToStringConverter.convert(term.trigger, term.globalTimeInterval, TimeRepresentation.PASSED),
+				TermToStringConverter.convert(term.invariant, term.globalTimeInterval, TimeRepresentation.PASSED),
+				TermToStringConverter.convert(term.fin, term.globalTimeInterval, TimeRepresentation.PASSED),
+				TermToStringConverter.convert(term.delay, term.globalTimeInterval, TimeRepresentation.PASSED),
+				TermToStringConverter.convert(term.reaction, term.globalTimeInterval, TimeRepresentation.PASSED),
+				TermToStringConverter.convert(term.release, term.globalTimeInterval, TimeRepresentation.PASSED),
+				TermToStringConverter.convert(term.ltl_formula, term.globalTimeInterval, TimeRepresentation.PASSED),
+				TermToStringConverter.convert(term.ltl_formula, term.globalTimeInterval, TimeRepresentation.INTERVAL)
+			)
+			csvWriter.writeNext(csvRow)
+			reqNum++
+		}
+		
+		csvWriter.close();
+		
+		var csv = csvStringWriter.toString()
+		fsa.generateFile("ltl_output.csv", csv)
+		
+		cGenerator.generateCCode(resource, fsa, context)
+		consistency.generate(terms, fsa)
+
+		} catch (Exception e) {
+			val diagnostic = new Resource.Diagnostic {
+        		override getLocation() { resource.URI.toString }
+            	override getMessage() { e.toString() }
+            	override getLine() { -1 }
+            	override getColumn() { -1 }
+        	}
+        
+        	resource.errors.add(diagnostic)
+		}
+	}
+
+	public def List<EdtlTerms> parseEdtl(Model ast) {
+		val reqs = ast.reqs
 		var String globalTimeInterval
 		
 		if (ast.globInterval === null) {
@@ -95,11 +134,8 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 		} else {
 			globalTimeInterval = ast.globInterval.globInterval.interval // format: 1h1m1s1ms
 		}
-	
-		var reqNum = 1
-		val logicNGReqs = new ArrayList<Req>()
-		val logicNGFactory = new FormulaFactory()
-		val termToLogicNGConverter = new TermToLogicNGConverter(logicNGFactory)
+
+		val terms = new ArrayList<EdtlTerms>()
 		
 		for (req : reqs) {
 			var trigger = ExprToTermConverter.convertOrDefault(req.trigExpr, Attribute.TRIGGER, new BoolTerm(true))
@@ -121,71 +157,9 @@ class EdtlGenerator extends AbstractGenerator implements IEdtlGenerator {
 			val x9 = impl(x0, x8)
 			val ltl_formula = globally(x9)
 
-			var out = "\nRequirement " + req.name + ":\n" + 
-			"trigger: " + convertExprToStringOrDefault(req.trigExpr, "true") + "\n" +
-			"invariant: " + convertExprToStringOrDefault(req.invExpr, "true") + "\n" +
-			"final: " + convertExprToStringOrDefault(req.finalExpr, "false") + "\n" +
-			"delay: " + convertExprToStringOrDefault(req.delayExpr, "false") + "\n" +
-			"reaction: " + convertExprToStringOrDefault(req.reacExpr, "true") + "\n" +
-			"release: " + convertExprToStringOrDefault(req.relExpr, "false") + "\n\n" +
-			"LTL formula:\n" + convertTermToString(ltl_formula, false) + "\n"
-			// + expanded/substituted expr
-			
-			System.out.println(out)
-			
-			val csvRow = newArrayList(reqNum.toString(), req.name, 
-				TermToStringConverter.convert(trigger, globalTimeInterval, TimeRepresentation.PASSED),
-				TermToStringConverter.convert(invariant, globalTimeInterval, TimeRepresentation.PASSED),
-				TermToStringConverter.convert(fin, globalTimeInterval, TimeRepresentation.PASSED),
-				TermToStringConverter.convert(delay, globalTimeInterval, TimeRepresentation.PASSED),
-				TermToStringConverter.convert(reaction, globalTimeInterval, TimeRepresentation.PASSED),
-				TermToStringConverter.convert(release, globalTimeInterval, TimeRepresentation.PASSED),
-				TermToStringConverter.convert(ltl_formula, globalTimeInterval, TimeRepresentation.PASSED),
-				TermToStringConverter.convert(ltl_formula, globalTimeInterval, TimeRepresentation.INTERVAL)
-				// + expanded LTL
-			)
-
-			var logicng_ltl_formula = Optional.empty();
-			try {
-				logicng_ltl_formula = Optional.of(termToLogicNGConverter.convert(ltl_formula))
-			} catch (Exception e) {
-				logicng_ltl_formula = Optional.empty()
-			}
-
-			logicNGReqs.add(new Req(
-				req.name,
-				termToLogicNGConverter.convert(trigger),
-				termToLogicNGConverter.convert(invariant),
-				termToLogicNGConverter.convert(fin),
-				termToLogicNGConverter.convert(delay),
-				termToLogicNGConverter.convert(reaction),
-				termToLogicNGConverter.convert(release),
-				logicng_ltl_formula
-			))
-
-			csvWriter.writeNext(csvRow)
-			reqNum++
+			terms.add(new EdtlTerms(req.name, trigger, invariant, fin, delay, reaction, release, ltl_formula, globalTimeInterval))
 		}
-		
-		csvWriter.close();
-		
-		var csv = csvStringWriter.toString()
-		fsa.generateFile("ltl_output.csv", csv)
-		
-		cGenerator.generateCCode(resource, fsa, context)
-
-		val consistency = new ConsistencyGenerator(logicNGFactory)
-		consistency.generate(logicNGReqs, fsa)
-		} catch (Exception e) {
-			val diagnostic = new Resource.Diagnostic {
-        		override getLocation() { resource.URI.toString }
-            	override getMessage() { e.toString() }
-            	override getLine() { -1 }
-            	override getColumn() { -1 }
-        	}
-        
-        	resource.errors.add(diagnostic)
-		}
+		return terms
 	}
 	
 	
@@ -1676,4 +1650,17 @@ class LowTerm implements UnaryTerm {
 	override hashCode() {
 		return 1
 	}
+}
+
+@Data
+class EdtlTerms {
+    String name
+    Term trigger
+    Term invariant
+    Term fin
+    Term delay
+    Term reaction
+    Term release
+    Term ltl_formula
+	String globalTimeInterval
 }

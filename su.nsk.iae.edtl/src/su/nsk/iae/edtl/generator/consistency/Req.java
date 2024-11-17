@@ -1,4 +1,4 @@
-package su.nsk.iae.edtl.generator;
+package su.nsk.iae.edtl.generator.consistency;
 
 import org.logicng.formulas.Formula;
 

@@ -1,10 +1,11 @@
-package su.nsk.iae.edtl.generator;
+package su.nsk.iae.edtl.generator.consistency;
 
 import com.opencsv.CSVWriter;
 
 import org.eclipse.xtext.generator.IFileSystemAccess2;
 import org.logicng.formulas.FormulaFactory;
 import org.logicng.util.Pair;
+import su.nsk.iae.edtl.generator.*;
 
 import java.io.StringWriter;
 import java.util.*;
@@ -14,18 +15,16 @@ public class ConsistencyGenerator {
 
     private final StringWriter csvStringWriter = new StringWriter();
     private final CSVWriter csvWriter = new CSVWriter(csvStringWriter);
-    private final FormulaFactory f;
-
-    public ConsistencyGenerator(FormulaFactory f) {
-        this.f = f;
-    }
+    private final FormulaFactory f = new FormulaFactory();
+    private final TermToLogicNGConverter termToLogicNGConverter = new TermToLogicNGConverter(f);
 
 
-    public void generate(List<Req> reqs, IFileSystemAccess2 fsa) {
+    public void generate(List<EdtlTerms> terms, IFileSystemAccess2 fsa) {
+        List<Req> reqs = termToLogicNGConverter.convert(terms);
         List<String> reqNames = reqs.stream().map(Req::name).collect(Collectors.toList());
         reqNames.add(0, " ");
         csvWriter.writeNext(reqNames.toArray(String[]::new));
-        var consistMap = consistencyChecker(reqs);
+        var consistMap = checkConsistency(terms);
         for (var entry : consistMap.entrySet()) {
             List<String> line = new ArrayList<>();
             line.add(entry.getKey());
@@ -33,10 +32,11 @@ public class ConsistencyGenerator {
             csvWriter.writeNext(line.toArray(String[]::new));
         }
         //System.out.println(csvStringWriter.toString());
-        fsa.generateFile("reqs_output.csv", csvStringWriter.toString());
+        fsa.generateFile("consistency_output.csv", csvStringWriter.toString());
     }
 
-    public Map<String, List<Pair<String, Answer>>> consistencyChecker(List<Req> reqs) {
+    public Map<String, List<Pair<String, Answer>>> checkConsistency(List<EdtlTerms> terms) {
+        List<Req> reqs = termToLogicNGConverter.convert(terms);
         Map<String, List<Pair<String, Answer>>> ret = new LinkedHashMap<>();
         for (int i = 0; i < reqs.size(); i++) {
             ret.put(reqs.get(i).name(), new ArrayList<>());

@@ -20,6 +20,8 @@ import su.nsk.iae.edtl.edtl.UnExpression
 import su.nsk.iae.edtl.edtl.DeclVarInput
 import su.nsk.iae.edtl.edtl.DeclVarOutput
 import su.nsk.iae.edtl.edtl.VarDeclaration
+import su.nsk.iae.edtl.generator.EdtlGenerator
+import su.nsk.iae.edtl.generator.consistency.*
 import java.util.ArrayList
 import java.util.HashSet
 import su.nsk.iae.edtl.edtl.Abbr
@@ -34,6 +36,8 @@ import java.util.regex.PatternSyntaxException
 class EdtlValidator extends AbstractEdtlValidator {
 	
 	val ePackage = EdtlPackage.eINSTANCE
+	val edtlGenerator = new EdtlGenerator
+	val consistency = new ConsistencyGenerator
 
 
 /* ======================= START REPETITION CHECKS ======================= */
@@ -60,6 +64,18 @@ class EdtlValidator extends AbstractEdtlValidator {
 		varDecls.stream.map([x | x.v]).anyMatch([x | (x !== ele) &&
 			x.name.equals(ele.name)
 		])
+	}
+
+	@Check
+	def checkRequirement_Consistency(Requirement ele){
+		val model = ele.getContainerOfType(Model)
+		val terms = edtlGenerator.parseEdtl(model)
+		val cons = consistency.checkConsistency(terms)
+		
+		if (cons.get(ele.name).stream.anyMatch([p | p.second() == Answer.INCONSISTENT])) {
+			warning("The requirement is incompatible with: " + cons.get(ele.name).filter[p | p.second() == Answer.INCONSISTENT].map[p | p.first()].join(", "), ePackage.requirement_Name)
+			return
+		}
 	}
 	
 	@Check
