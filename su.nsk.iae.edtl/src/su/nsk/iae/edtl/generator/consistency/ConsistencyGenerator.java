@@ -29,16 +29,16 @@ public class ConsistencyGenerator {
         for (var entry : consistMap.entrySet()) {
             List<String> line = new ArrayList<>();
             line.add(entry.getKey());
-            line.addAll(entry.getValue().stream().map(p -> p.second().name()).collect(Collectors.toList()));
+            line.addAll(entry.getValue().stream().map(p -> p.second().answer().name()).collect(Collectors.toList()));
             csvWriter.writeNext(line.toArray(String[]::new));
         }
         //System.out.println(csvStringWriter.toString());
         fsa.generateFile("consistency_output.csv", csvStringWriter.toString());
     }
 
-    public Map<String, List<Pair<String, Answer>>> checkConsistency(List<EdtlTerms> terms) {
+    public Map<String, List<Pair<String, Result>>> checkConsistency(List<EdtlTerms> terms) {
         List<Req> reqs = termToLogicNGConverter.convert(terms);
-        Map<String, List<Pair<String, Answer>>> ret = new LinkedHashMap<>();
+        Map<String, List<Pair<String, Result>>> ret = new LinkedHashMap<>();
         for (int i = 0; i < reqs.size(); i++) {
             ret.put(reqs.get(i).name(), new ArrayList<>());
             for (int j = 0; j < reqs.size(); j++) {
@@ -48,21 +48,21 @@ public class ConsistencyGenerator {
         return ret;
     }
 
-    private Answer decide(Req req1, Req req2) {
+    private Result decide(Req req1, Req req2) {
         if (!req1.trigger().implies(req2.trigger()) && !req2.trigger().implies(req1.trigger())) {
-            return Answer.UNKNOWN;
+            return new Result(Answer.UNKNOWN);
         }
 
         if (req1.substituteFormula().isPresent() && req1.substituteFormula().get().isTautology()) {
-            return Answer.UNKNOWN;
+            return new Result(Answer.UNKNOWN);
         } else if (req1.substituteFormula().isPresent() && req1.substituteFormula().get().isContradiction()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "Because the requirement 1 is not achivable");
         }
 
         if (req2.substituteFormula().isPresent() && req2.substituteFormula().get().isTautology()) {
-            return Answer.UNKNOWN;
+            return new Result(Answer.UNKNOWN);
         } else if (req2.substituteFormula().isPresent() && req2.substituteFormula().get().isContradiction()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "Because the requirement 2 is not achivable");
         }
 
         if (req1.trigger().implies(req2.trigger())) {
@@ -72,10 +72,10 @@ public class ConsistencyGenerator {
         }
 
 
-        return Answer.UNKNOWN;
+        return new Result(Answer.UNKNOWN);
     }
 
-    private Answer compare(Req req1, Req req2) {
+    private Result compare(Req req1, Req req2) {
         Formula trg = f.or(f.and(req1.trigger(), f.not(req1.release())), req1.invariant(), f.and(req2.trigger(), f.not(req2.release())));
 
         // 1
@@ -85,7 +85,7 @@ public class ConsistencyGenerator {
                 f.implication(trg, f.and(req1.fin(), req1.reaction())),
                 f.not(f.implication(trg, f.or(req2.release(), f.and(req2.fin(), req2.reaction()))))
         ).isTautology()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "because invariant1 and invariant2 are inconsistent");
         }
 
         // 2
@@ -94,7 +94,7 @@ public class ConsistencyGenerator {
                 f.implication(trg, req1.release()),
                 f.not(f.implication(trg, f.or(req2.release(), f.and(req2.fin(), req2.reaction()))))
         ).isTautology()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "because release1 and invariant2 are inconsistent");
         }
 
         // 3
@@ -103,7 +103,7 @@ public class ConsistencyGenerator {
                 f.implication(trg, f.and(req1.fin(), req1.reaction())),
                 f.not(f.implication(trg, f.or(req2.release(), f.and(req2.fin(), req2.reaction()))))
         ).isTautology()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "because (final1 ∧ reaction1) and invariant2 are inconsistent");
         }
         
         // 4
@@ -112,7 +112,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(req1.release(), req2.invariant())),
                 f.not(f.implication(f.or(req1.release(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "because release1 and invariant2 are inconsistent");
         }
 
         // 5
@@ -121,7 +121,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(req1.reaction(), req2.invariant())),
                 f.not(f.implication(f.or(req1.reaction(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "because reaction1 and invariant2 are inconsistent");
         }
 
         // 6
@@ -130,7 +130,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(req1.fin(), req2.invariant())),
                 f.not(f.implication(f.or(req1.fin(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT, "because final1 and invariant2 are inconsistent");
         }
 
         // 7
@@ -140,7 +140,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(f.or(req1.invariant(), req1.fin()), req2.release())),
                 f.not(f.and(f.or(req1.invariant(), req1.fin()), req2.reaction()))
         ).isTautology()) {
-            return Answer.INCONSISTENT;
+            return new Result(Answer.INCONSISTENT);
         }
 
         // CONSISTENT
@@ -151,10 +151,10 @@ public class ConsistencyGenerator {
                 f.implication(req1.reaction(), req2.reaction()),
                 f.implication(req1.release(), req2.release())
         ).isTautology()) {
-            return Answer.CONSISTENT;
+            return new Result(Answer.CONSISTENT);
         }
 
-        return Answer.UNKNOWN;
+        return new Result(Answer.UNKNOWN);
     }
 
 }
