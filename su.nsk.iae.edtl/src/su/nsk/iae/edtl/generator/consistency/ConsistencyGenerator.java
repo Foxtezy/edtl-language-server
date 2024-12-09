@@ -56,13 +56,13 @@ public class ConsistencyGenerator {
         if (req1.substituteFormula().isPresent() && req1.substituteFormula().get().isTautology()) {
             return new Result(Answer.UNKNOWN);
         } else if (req1.substituteFormula().isPresent() && req1.substituteFormula().get().isContradiction()) {
-            return new Result(Answer.INCONSISTENT, "Because the requirement 1 is not achivable");
+            return new Result(Answer.INCONSISTENT, "Because this requirement is not achivable");
         }
 
         if (req2.substituteFormula().isPresent() && req2.substituteFormula().get().isTautology()) {
             return new Result(Answer.UNKNOWN);
         } else if (req2.substituteFormula().isPresent() && req2.substituteFormula().get().isContradiction()) {
-            return new Result(Answer.INCONSISTENT, "Because the requirement 2 is not achivable");
+            return new Result(Answer.INCONSISTENT, "Because that requirement is not achivable");
         }
 
         if (req1.trigger().implies(req2.trigger())) {
@@ -140,7 +140,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(f.or(req1.invariant(), req1.fin()), req2.release())),
                 f.not(f.and(f.or(req1.invariant(), req1.fin()), req2.reaction()))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT);
+            return new Result(Answer.INCONSISTENT, "bacause invariant1 and not delay2 are inconsistent");
         }
 
         // CONSISTENT
