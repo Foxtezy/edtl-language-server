@@ -39,10 +39,16 @@ public class ConsistencyGenerator {
     public Map<String, List<Pair<String, Result>>> checkConsistency(List<EdtlTerms> terms) {
         List<Req> reqs = termToLogicNGConverter.convert(terms);
         Map<String, List<Pair<String, Result>>> ret = new LinkedHashMap<>();
+        for (Req req : reqs) {
+            ret.put(req.name(), new ArrayList<>());
+        }
         for (int i = 0; i < reqs.size(); i++) {
-            ret.put(reqs.get(i).name(), new ArrayList<>());
-            for (int j = 0; j < reqs.size(); j++) {
-                ret.get(reqs.get(i).name()).add(new Pair<>(reqs.get(j).name(), decide(reqs.get(i), reqs.get(j))));
+            for (int j = i; j < reqs.size(); j++) {
+                Result res = decide(reqs.get(i), reqs.get(j));
+                ret.get(reqs.get(i).name()).add(new Pair<>(reqs.get(j).name(), res));
+                if (i != j) {
+                    ret.get(reqs.get(j).name()).add(new Pair<>(reqs.get(i).name(), res));
+                }
             }
         }
         return ret;
@@ -54,13 +60,13 @@ public class ConsistencyGenerator {
         }
 
         if (req1.substituteFormula().isPresent() && req1.substituteFormula().get().isTautology()) {
-            return new Result(Answer.UNKNOWN);
+            return new Result(Answer.CONSISTENT);
         } else if (req1.substituteFormula().isPresent() && req1.substituteFormula().get().isContradiction()) {
             return new Result(Answer.INCONSISTENT, "Because this requirement is not achivable");
         }
 
         if (req2.substituteFormula().isPresent() && req2.substituteFormula().get().isTautology()) {
-            return new Result(Answer.UNKNOWN);
+            return new Result(Answer.CONSISTENT);
         } else if (req2.substituteFormula().isPresent() && req2.substituteFormula().get().isContradiction()) {
             return new Result(Answer.INCONSISTENT, "Because that requirement is not achivable");
         }
@@ -81,29 +87,26 @@ public class ConsistencyGenerator {
         // 1
         if (f.and(
                 f.not(f.and(req1.invariant(), req2.invariant())),
-                f.implication(trg, req1.release()),
-                f.implication(trg, f.and(req1.fin(), req1.reaction())),
-                f.not(f.implication(trg, f.or(req2.release(), f.and(req2.fin(), req2.reaction()))))
+                f.not(f.implication(trg, f.and(req1.fin(), req1.reaction()))),
+                f.not(f.implication(trg, f.and(req2.fin(), req2.reaction())))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT, "because invariant1 and invariant2 are inconsistent");
+            return new Result(Answer.INCONSISTENT, "1 because invariant1 and invariant2 are inconsistent");
         }
 
         // 2
         if (f.and(
                 f.not(f.and(req1.release(), req2.invariant())),
-                f.implication(trg, req1.release()),
-                f.not(f.implication(trg, f.or(req2.release(), f.and(req2.fin(), req2.reaction()))))
+                f.not(f.implication(trg, f.and(req2.fin(), req2.reaction())))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT, "because release1 and invariant2 are inconsistent");
+            return new Result(Answer.INCONSISTENT, "2 because release1 and invariant2 are inconsistent");
         }
 
         // 3
         if (f.and(
                 f.not(f.and(f.and(req1.fin(), req1.reaction()), req2.invariant())),
-                f.implication(trg, f.and(req1.fin(), req1.reaction())),
-                f.not(f.implication(trg, f.or(req2.release(), f.and(req2.fin(), req2.reaction()))))
+                f.not(f.implication(trg, f.and(req2.fin(), req2.reaction())))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT, "because (final1 ∧ reaction1) and invariant2 are inconsistent");
+            return new Result(Answer.INCONSISTENT, "3 because (final1 ∧ reaction1) and invariant2 are inconsistent");
         }
         
         // 4
@@ -112,7 +115,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(req1.release(), req2.invariant())),
                 f.not(f.implication(f.or(req1.release(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT, "because release1 and invariant2 are inconsistent");
+            return new Result(Answer.INCONSISTENT, "4 because release1 and invariant2 are inconsistent");
         }
 
         // 5
@@ -121,7 +124,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(req1.reaction(), req2.invariant())),
                 f.not(f.implication(f.or(req1.reaction(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT, "because reaction1 and invariant2 are inconsistent");
+            return new Result(Answer.INCONSISTENT, "5 because reaction1 and invariant2 are inconsistent");
         }
 
         // 6
@@ -130,7 +133,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(req1.fin(), req2.invariant())),
                 f.not(f.implication(f.or(req1.fin(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT, "because final1 and invariant2 are inconsistent");
+            return new Result(Answer.INCONSISTENT, "6 because final1 and invariant2 are inconsistent");
         }
 
         // 7
@@ -140,7 +143,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(f.or(req1.invariant(), req1.fin()), req2.release())),
                 f.not(f.and(f.or(req1.invariant(), req1.fin()), req2.reaction()))
         ).isTautology()) {
-            return new Result(Answer.INCONSISTENT, "bacause invariant1 and not delay2 are inconsistent");
+            return new Result(Answer.INCONSISTENT, "7 bacause invariant1 and not delay2 are inconsistent");
         }
 
         // CONSISTENT
