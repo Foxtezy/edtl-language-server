@@ -26,32 +26,32 @@ public class ConsistencyGenerator {
         reqNames.add(0, " ");
         csvWriter.writeNext(reqNames.toArray(String[]::new));
         var consistMap = checkConsistency(terms);
-        for (var entry : consistMap.entrySet()) {
+        for (var entry : consistMap.sequencedEntrySet()) {
             List<String> line = new ArrayList<>();
             line.add(entry.getKey());
-            line.addAll(entry.getValue().stream().map(p -> p.second().answer().name()).collect(Collectors.toList()));
+            line.addAll(entry.getValue().sequencedEntrySet().stream().map(e -> e.getValue().answer().name()).collect(Collectors.toList()));
             csvWriter.writeNext(line.toArray(String[]::new));
         }
         fsa.generateFile("consistency_output.csv", csvStringWriter.toString());
     }
 
-    public Map<String, List<Pair<String, Result>>> checkConsistency(List<EdtlTerms> terms) {
+    public SequencedMap<String, SequencedMap<String, Result>> checkConsistency(List<EdtlTerms> terms) {
         List<Req> reqs = termToLogicNGConverter.convert(terms);
-        Map<String, List<Pair<String, Result>>> ret = new LinkedHashMap<>();
+        SequencedMap<String, SequencedMap<String, Result>> ret = new LinkedHashMap<>();
 
         for (Req req : reqs) {
-            ret.put(req.name(), new ArrayList<>());
+            ret.put(req.name(), new LinkedHashMap<>());
         }
 
         for (int i = 0; i < reqs.size(); i++) {
             for (int j = i; j < reqs.size(); j++) {
                 if (i == j) {
                     Result res = decide(reqs.get(i));
-                    ret.get(reqs.get(i).name()).add(new Pair<>(reqs.get(i).name(), res));
+                    ret.get(reqs.get(i).name()).put(reqs.get(i).name(), res);
                 } else {
                     Result res = decide(reqs.get(i), reqs.get(j));
-                    ret.get(reqs.get(i).name()).add(new Pair<>(reqs.get(j).name(), res));
-                    ret.get(reqs.get(j).name()).add(new Pair<>(reqs.get(i).name(), res));
+                    ret.get(reqs.get(i).name()).put(reqs.get(j).name(), res);
+                    ret.get(reqs.get(j).name()).put(reqs.get(i).name(), res);
                 }
             }
         }
