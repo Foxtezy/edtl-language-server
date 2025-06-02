@@ -5,7 +5,6 @@ import com.opencsv.CSVWriter;
 import org.eclipse.xtext.generator.IFileSystemAccess2;
 import org.logicng.formulas.Formula;
 import org.logicng.formulas.FormulaFactory;
-import org.logicng.util.Pair;
 import su.nsk.iae.edtl.generator.*;
 
 import java.io.StringWriter;
@@ -105,7 +104,7 @@ public class ConsistencyGenerator {
                 f.not(f.implication(trg, f.and(req2.fin(), req2.reaction())))
         ).isTautology()) {
             answer = Answer.INCONSISTENT;
-            explanation.add("1 because invariant1 and invariant2 are inconsistent");
+            explanation.add("inv₁ • inv₂, ¬(TRG → (fin₁ ∧ rea₁)), ¬(TRG → (fin₂ ∧ rea₂))");
         }
 
         // 2
@@ -114,7 +113,7 @@ public class ConsistencyGenerator {
                 f.not(f.implication(trg, f.and(req2.fin(), req2.reaction())))
         ).isTautology()) {
             answer = Answer.INCONSISTENT;
-            explanation.add("2 because release1 and invariant2 are inconsistent");
+            explanation.add("rel₁ • inv₂, ¬(TRG → (fin₂ ∧ rea₂))");
         }
 
         // 3
@@ -123,7 +122,7 @@ public class ConsistencyGenerator {
                 f.not(f.implication(trg, f.and(req2.fin(), req2.reaction())))
         ).isTautology()) {
             answer = Answer.INCONSISTENT;
-            explanation.add("3 because (final1 ∧ reaction1) and invariant2 are inconsistent");
+            explanation.add("(fin₁ ∧ rea₁) • inv₂, ¬(TRG → (fin₂ ∧ rea₂))");
         }
         
         // 4
@@ -133,7 +132,7 @@ public class ConsistencyGenerator {
                 f.not(f.implication(f.or(req1.release(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
             answer = Answer.INCONSISTENT;
-            explanation.add("4 because release1 and invariant2 are inconsistent");
+            explanation.add("rel₁ → fin₂, rel₁ • inv₂, ¬((rel₁ ∨ fin₂) → (rel₂ ∨ rea₂))");
         }
 
         // 5
@@ -143,7 +142,7 @@ public class ConsistencyGenerator {
                 f.not(f.implication(f.or(req1.reaction(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
             answer = Answer.INCONSISTENT;
-            explanation.add("5 because reaction1 and invariant2 are inconsistent");
+            explanation.add("rea₁ → fin₂, rea₁ • inv₂, ¬((rea₁ ∨ fin₂) → (rel₂ ∨ rea₂))");
         }
 
         // 6
@@ -153,7 +152,7 @@ public class ConsistencyGenerator {
                 f.not(f.implication(f.or(req1.fin(), req2.fin()), f.or(req2.release(), req2.reaction())))
         ).isTautology()) {
             answer = Answer.INCONSISTENT;
-            explanation.add("6 because final1 and invariant2 are inconsistent");
+            explanation.add("fin₁ → fin₂, fin₁ • inv₂, ¬((fin₁ ∨ fin₂) → (rel₂ ∨ rea₂))");
         }
 
         // 7
@@ -164,7 +163,7 @@ public class ConsistencyGenerator {
                 f.not(f.and(f.or(req1.invariant(), req1.fin()), req2.reaction()))
         ).isTautology()) {
             answer = Answer.INCONSISTENT;
-            explanation.add("7 bacause invariant1 and not delay2 are inconsistent");
+            explanation.add("fin₁ → fin₂, inv₁ • ¬del₂, (inv₁ ∨ fin₁) • rel₂, (inv₁ ∨ fin₁) • rea₂");
         }
 
         // CONSISTENT

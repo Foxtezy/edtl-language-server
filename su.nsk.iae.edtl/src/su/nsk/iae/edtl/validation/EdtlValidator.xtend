@@ -73,7 +73,7 @@ class EdtlValidator extends AbstractEdtlValidator {
 		val cons = consistency.checkConsistency(terms)
 		
 		if (cons.get(ele.name).entrySet.stream.anyMatch([p | p.getValue().answer() == Answer.INCONSISTENT])) {
-			warning("The requirement contradicts other requirements: " + cons.get(ele.name).entrySet.filter[p | p.getValue().answer() == Answer.INCONSISTENT].map[p | "[" + p.getKey() + " " + p.getValue().explanation().join(", ") + "]"].join(", "), ePackage.requirement_Name)
+			warning("The requirement contradicts other requirements: " + cons.get(ele.name).entrySet.filter[p | p.getValue().answer() == Answer.INCONSISTENT].map[p | "[" + p.getKey() + " because " + p.getValue().explanation().join(" and ") + "]"].join(", "), ePackage.requirement_Name)
 			return
 		}
 	}
